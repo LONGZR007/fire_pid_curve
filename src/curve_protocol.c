@@ -1,5 +1,5 @@
 
-#include "./protocol.h"
+#include "curve_protocol.h"
 #include <string.h>
 
 struct prot_frame_parser_t
@@ -12,8 +12,8 @@ struct prot_frame_parser_t
 };
 
 static struct prot_frame_parser_t parser;
-
 static uint8_t recv_buf[PROT_FRAME_LEN_RECV];
+static rt_device_t serial = NULL;
 
 /**
   * @brief 计算校验和
@@ -248,101 +248,47 @@ uint8_t protocol_frame_parse(uint8_t *data, uint16_t *data_len)
  */
 void protocol_data_recv(uint8_t *data, uint16_t data_len)
 {
-    recvbuf_put_data(parser.recv_ptr, PROT_FRAME_LEN_RECV, parser.w_oft, data, data_len);    // 接收数据
-    parser.w_oft = (parser.w_oft + data_len) % PROT_FRAME_LEN_RECV;                          // 计算写偏移
+    uint8_t buffer[PROT_FRAME_LEN_RECV];
+
+    if (!data && !data_len)
+    {
+        data_len = rt_device_read(serial, 0, buffer, PROT_FRAME_LEN_RECV);
+        data = buffer;
+    }
+
+    if (data && data_len > 0)
+    {
+        recvbuf_put_data(parser.recv_ptr, PROT_FRAME_LEN_RECV, parser.w_oft, data, data_len);    // 接收数据
+        parser.w_oft = (parser.w_oft + data_len) % PROT_FRAME_LEN_RECV;                          // 计算写偏移
+    }
 }
 
 /**
  * @brief   初始化接收协议
- * @param   void
+ * @param   name:串口设备名
  * @return  初始化结果.
  */
-int32_t protocol_init(void)
+int32_t protocol_init(const char *name)
 {
     memset(&parser, 0, sizeof(struct prot_frame_parser_t));
     
     /* 初始化分配数据接收与解析缓冲区*/
     parser.recv_ptr = recv_buf;
 
-
-  
-    return 0;
-}
-
-/**
- * @brief   接收的数据处理
- * @param   void
- * @return  -1：没有找到一个正确的命令.
- */
-int8_t receiving_process(void)
-{
-  uint8_t frame_data[128];         // 要能放下最长的帧
-  uint16_t frame_len = 0;          // 帧长度
-  uint8_t cmd_type = CMD_NONE;     // 命令类型
-  
-  while(1)
-  {
-    cmd_type = protocol_frame_parse(frame_data, &frame_len);
-    switch (cmd_type)
+    serial = rt_device_find(name);
+    if (serial)
     {
-      case CMD_NONE:
-      {
-        return -1;
-      }
-
-      case SET_P_I_D_CMD:
-      {
-        uint32_t temp0 = COMPOUND_32BIT(&frame_data[13]);
-        uint32_t temp1 = COMPOUND_32BIT(&frame_data[17]);
-        uint32_t temp2 = COMPOUND_32BIT(&frame_data[21]);
-        
-        float p_temp, i_temp, d_temp;
-        
-        p_temp = *(float *)&temp0;
-        i_temp = *(float *)&temp1;
-        d_temp = *(float *)&temp2;
-        
-        set_p_i_d(p_temp, i_temp, d_temp);    // 设置 P I D
-      }
-      break;
-
-      case SET_TARGET_CMD:
-      {
-        int actual_temp = COMPOUND_32BIT(&frame_data[13]);    // 得到数据
-        
-        set_pid_target(actual_temp);    // 设置目标值
-      }
-      break;
-      
-      case START_CMD:
-      {
-        set_motor_enable();              // 启动电机
-      }
-      break;
-      
-      case STOP_CMD:
-      {
-        set_motor_disable();              // 停止电机
-      }
-      break;
-      
-      case RESET_CMD:
-      {
-        HAL_NVIC_SystemReset();          // 复位系统
-      }
-      break;
-      
-      case SET_PERIOD_CMD:
-      {
-        uint32_t temp = COMPOUND_32BIT(&frame_data[13]);     // 周期数
-        SET_BASIC_TIM_PERIOD(temp);                             // 设置定时器周期1~1000ms
-      }
-      break;
-
-      default: 
+        if (rt_device_open(serial, RT_DEVICE_FLAG_WRONLY))
+        {
+            return -1;
+        }
+    }
+    else
+    {
         return -1;
     }
-  }
+
+    return 0;
 }
 
 /**
@@ -368,9 +314,9 @@ void set_computer_value(uint8_t cmd, uint8_t ch, void *data, uint8_t num)
   sum = check_sum(0, (uint8_t *)&set_packet, sizeof(set_packet));       // 计算包头校验和
   sum = check_sum(sum, (uint8_t *)data, num);                           // 计算参数校验和
   
-  HAL_UART_Transmit(&UartHandle, (uint8_t *)&set_packet, sizeof(set_packet), 0xFFFFF);    // 发送数据头
-  HAL_UART_Transmit(&UartHandle, (uint8_t *)data, num, 0xFFFFF);                          // 发送参数
-  HAL_UART_Transmit(&UartHandle, (uint8_t *)&sum, sizeof(sum), 0xFFFFF);                  // 发送校验和
+  rt_device_write(serial, 0, (uint8_t *)&set_packet, sizeof(set_packet));    // 发送数据头
+  rt_device_write(serial, 0, (uint8_t *)data, num);                          // 发送参数
+  rt_device_write(serial, 0, (uint8_t *)&sum, sizeof(sum));                  // 发送校验和
 }
 
 /**********************************************************************************************/

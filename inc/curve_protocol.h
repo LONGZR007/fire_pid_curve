@@ -1,6 +1,6 @@
 
-#ifndef __PROTOCOL_H__
-#define __PROTOCOL_H__
+#ifndef __CURVE_PROTOCOL_H__
+#define __CURVE_PROTOCOL_H__
 
 /*****************************************************************************/
 /* Includes                                                                  */
@@ -8,6 +8,7 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
+#include <stdint.h>
 
 #ifdef _cplusplus
 extern "C" {
@@ -19,8 +20,9 @@ extern "C" {
 /* 校验数据的长度 */
 #define PROT_FRAME_LEN_CHECKSUM    1
 
+#pragma pack(1)
 /* 数据头结构体 */
-typedef __packed struct
+typedef struct
 {
   uint32_t head;    // 包头
   uint8_t ch;       // 通道
@@ -29,6 +31,7 @@ typedef __packed struct
 //  uint8_t sum;      // 校验和
   
 }packet_head_t;
+#pragma pack()
 
 #define FRAME_HEADER     0x59485A53    // 帧头
 
@@ -84,17 +87,10 @@ void protocol_data_recv(uint8_t *data, uint16_t data_len);
 
 /**
  * @brief   初始化接收协议
- * @param   void
+ * @param   name:串口设备名
  * @return  初始化结果.
  */
-int32_t protocol_init(void);
-
-/**
- * @brief   接收的数据处理
- * @param   void
- * @return  -1：没有找到一个正确的命令.
- */
-int8_t receiving_process(void);
+int32_t protocol_init(const char *name);
 
 /**
   * @brief 设置上位机的值
@@ -118,4 +114,4 @@ uint8_t protocol_frame_parse(uint8_t *data, uint16_t *data_len);
 }
 #endif   
 
-#endif
+#endif    /* __CURVE_PROTOCOL_H__ END */
