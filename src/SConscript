@@ -1,0 +1,9 @@
+from building import *
+
+cwd     = GetCurrentDir()
+src     = Glob('*.c') + Glob('*.cpp')
+CPPPATH = [cwd + '/../inc']
+
+group = DefineGroup('Protocol', src, depend = ['FIRE_PID_CURVE'], CPPPATH = CPPPATH)
+
+Return('group')
