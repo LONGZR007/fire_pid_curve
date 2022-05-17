@@ -4,6 +4,6 @@ cwd     = GetCurrentDir()
 src     = Glob('*.c') + Glob('*.cpp')
 CPPPATH = [cwd]
 
-group = DefineGroup('Protocol', src, depend = ['FIRE_PID_CURVE_USING_EXAMPLE'], CPPPATH = CPPPATH)
+group = DefineGroup('Protocol', src, depend = ['PKG_USING_FIRE_PID_CURVE'], CPPPATH = CPPPATH)
 
 Return('group')
